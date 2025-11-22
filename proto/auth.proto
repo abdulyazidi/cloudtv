@@ -5,10 +5,10 @@ package auth;
 option go_package = "github.com/abdulyazidi/cloudtv/backend/pb/auth";
 
 service AuthService {
-  rpc Signup (SignUpRequest) returns (SignUpResponse) {}
+  rpc  Signup (SignupRequest) returns (SignupResponse) {}
 }
 
-message SignUpRequest {
+message SignupRequest {
   string email = 1;
   string username = 2;
   string password = 3;
@@ -16,8 +16,8 @@ message SignUpRequest {
 }
 
 
-message SignUpResponse {
-  string useR_id = 1;
+message SignupResponse {
+  string user_id = 1;
   string token = 2;
 }
 
