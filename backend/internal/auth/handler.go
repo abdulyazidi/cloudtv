@@ -21,10 +21,10 @@ func NewHandler(service *Service) *Handler {
 func (h *Handler) Signup(ctx context.Context, req *pb.SignupRequest) (*pb.SignupResponse, error) {
 	fmt.Println("Signup handler is hit.....")
 	h.service.Signup(ctx, SignupParams{
-		Username:        req.Username,
-		Email:           req.Email,
-		Password:        req.Password,
-		confirmPassword: req.Password,
+		Username: req.Username,
+		Email:    req.Email,
+		Password: req.Password,
 	})
+
 	return &pb.SignupResponse{UserId: "001", Token: "lmfao"}, nil
 }

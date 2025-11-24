@@ -7,27 +7,28 @@ package sqlc
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createUser = `-- name: CreateUser :one
 insert into users (
-  email, username, password_hash
-) values (
-  $1, $2, $3
+  username, email, password_hash
+)
+select $1, $2, $3
+where not exists (
+  select 1 from users
+  where username = $1 or email = $2
 )
 returning id, email, username, password_hash, stream_key, status, created_at, updated_at
 `
 
 type CreateUserParams struct {
-	Email        string
 	Username     string
-	PasswordHash pgtype.Text
+	Email        string
+	PasswordHash string
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser, arg.Email, arg.Username, arg.PasswordHash)
+	row := q.db.QueryRow(ctx, createUser, arg.Username, arg.Email, arg.PasswordHash)
 	var i User
 	err := row.Scan(
 		&i.ID,

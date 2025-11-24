@@ -5,28 +5,37 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 
 	"github.com/abdulyazidi/cloudtv/backend/internal/auth"
 	"github.com/abdulyazidi/cloudtv/backend/internal/db/sqlc"
 	pb "github.com/abdulyazidi/cloudtv/backend/pb/auth"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
 )
 
 func main() {
 	fmt.Println("cloudTV :)")
 	ctx := context.Background()
+	if err := godotenv.Load(); err != nil {
+		log.Fatal("Could not load .env file", err)
+	}
+	jwtSecret := os.Getenv("JWT_HMAC_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT_HMAC_SECRET is missing")
+	}
 
 	log.Println("Connecting to database...")
 	connString := "postgres://postgres:postgres@localhost:5432/cloudtv"
-	conn, err := pgx.Connect(ctx, connString)
+	pool, err := pgxpool.New(ctx, connString)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer conn.Close(ctx)
+	defer pool.Close()
 
-	queries := sqlc.New(conn)
-	authService := auth.NewService(queries)
+	queries := sqlc.New(pool)
+	authService := auth.NewService(queries, []byte(jwtSecret))
 	log.Println("✓ Auth service created")
 
 	authHandler := auth.NewHandler(authService)

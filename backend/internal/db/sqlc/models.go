@@ -140,7 +140,7 @@ type User struct {
 	ID           string
 	Email        string
 	Username     string
-	PasswordHash pgtype.Text
+	PasswordHash string
 	StreamKey    pgtype.Text
 	Status       NullUserStatus
 	CreatedAt    pgtype.Timestamptz

@@ -1,3 +1,18 @@
+MODULE=github.com/abdulyazidi/cloudtv/backend
+CMD=./cmd/cloudtv
+
+.PHONY: fmt vet build
+
+fmt:
+	go fmt ./...
+
+vet:
+	go vet ./...
+
+build: fmt vet
+	go build -o bin/cloudtv $(CMD)
+
+
 .PHONY: proto
 proto:
 	@echo "Generating Go code from proto files..."
