@@ -13,6 +13,7 @@ create table users(
   email text unique not null,
   username text unique not null,
   password_hash text not null,  -- if oauth signup just fill this with secure random hash
+  password_salt text not null,
   stream_key text unique,
   status user_status default 'ACTIVE',
   created_at timestamptz not null default now(),

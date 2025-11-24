@@ -91,8 +91,8 @@ func (x *SignupRequest) GetConfirmPassword() string {
 
 type SignupResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	Token         string                 `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`
+	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
+	ExpiresIn     int64                  `protobuf:"varint,2,opt,name=expires_in,json=expiresIn,proto3" json:"expires_in,omitempty"` // seconds until expiration
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -127,18 +127,18 @@ func (*SignupResponse) Descriptor() ([]byte, []int) {
 	return file_auth_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *SignupResponse) GetUserId() string {
+func (x *SignupResponse) GetAccessToken() string {
 	if x != nil {
-		return x.UserId
+		return x.AccessToken
 	}
 	return ""
 }
 
-func (x *SignupResponse) GetToken() string {
+func (x *SignupResponse) GetExpiresIn() int64 {
 	if x != nil {
-		return x.Token
+		return x.ExpiresIn
 	}
-	return ""
+	return 0
 }
 
 var File_auth_proto protoreflect.FileDescriptor
@@ -151,10 +151,11 @@ const file_auth_proto_rawDesc = "" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x1a\n" +
 	"\bpassword\x18\x03 \x01(\tR\bpassword\x12)\n" +
-	"\x10confirm_password\x18\x04 \x01(\tR\x0fconfirmPassword\"?\n" +
-	"\x0eSignupResponse\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x14\n" +
-	"\x05token\x18\x02 \x01(\tR\x05token2D\n" +
+	"\x10confirm_password\x18\x04 \x01(\tR\x0fconfirmPassword\"R\n" +
+	"\x0eSignupResponse\x12!\n" +
+	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12\x1d\n" +
+	"\n" +
+	"expires_in\x18\x02 \x01(\x03R\texpiresIn2D\n" +
 	"\vAuthService\x125\n" +
 	"\x06Signup\x12\x13.auth.SignupRequest\x1a\x14.auth.SignupResponse\"\x00B0Z.github.com/abdulyazidi/cloudtv/backend/pb/authb\x06proto3"
 

@@ -11,30 +11,37 @@ import (
 
 const createUser = `-- name: CreateUser :one
 insert into users (
-  username, email, password_hash
+  username, email, password_hash, password_salt
 )
-select $1, $2, $3
+select $1, $2, $3, $4
 where not exists (
   select 1 from users
   where username = $1 or email = $2
 )
-returning id, email, username, password_hash, stream_key, status, created_at, updated_at
+returning id, email, username, password_hash, password_salt, stream_key, status, created_at, updated_at
 `
 
 type CreateUserParams struct {
 	Username     string
 	Email        string
 	PasswordHash string
+	PasswordSalt string
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser, arg.Username, arg.Email, arg.PasswordHash)
+	row := q.db.QueryRow(ctx, createUser,
+		arg.Username,
+		arg.Email,
+		arg.PasswordHash,
+		arg.PasswordSalt,
+	)
 	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
 		&i.Username,
 		&i.PasswordHash,
+		&i.PasswordSalt,
 		&i.StreamKey,
 		&i.Status,
 		&i.CreatedAt,

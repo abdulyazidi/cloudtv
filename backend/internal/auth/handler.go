@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"time"
 
 	pb "github.com/abdulyazidi/cloudtv/backend/pb/auth"
 )
@@ -19,12 +20,18 @@ func NewHandler(service *Service) *Handler {
 }
 
 func (h *Handler) Signup(ctx context.Context, req *pb.SignupRequest) (*pb.SignupResponse, error) {
-	fmt.Println("Signup handler is hit.....")
-	h.service.Signup(ctx, SignupParams{
+	fmt.Println("HIT: Auth signup handler")
+	// TODO: Input validation
+	signupResponse, err := h.service.Signup(ctx, SignupParams{
 		Username: req.Username,
 		Email:    req.Email,
 		Password: req.Password,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("error creating a new user: %s", err)
+	}
 
-	return &pb.SignupResponse{UserId: "001", Token: "lmfao"}, nil
+	return &pb.SignupResponse{
+		AccessToken: signupResponse.Token,
+		ExpiresIn:   int64(time.Until(signupResponse.ExpiresAt).Seconds())}, nil
 }
