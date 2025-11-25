@@ -36,3 +36,20 @@ func (h *Handler) Signup(ctx context.Context, req *pb.SignupRequest) (*pb.Signup
 		AccessToken: signupResponse.Token,
 		ExpiresIn:   int64(time.Until(signupResponse.ExpiresAt).Seconds())}, nil
 }
+
+func (h *Handler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
+	fmt.Println("HIT: Auth login handler")
+
+	loginResponse, err := h.service.Login(ctx, LoginParams{
+		Username: req.Username,
+		Password: req.Password,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("login failed: %s", err)
+	}
+
+	return &pb.LoginResponse{
+		AccessToken: loginResponse.Token,
+		ExpiresIn:   int64(time.Until(loginResponse.ExpiresAt).Seconds()),
+	}, nil
+}

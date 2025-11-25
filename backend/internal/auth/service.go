@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -25,13 +26,26 @@ var (
 )
 
 var (
-	ErrUserAlreadyExists = errors.New("user with this username or email already exists")
-	ErrValidation        = errors.New("validation failed")
+	ErrUserAlreadyExists  = errors.New("user with this username or email already exists")
+	ErrValidation         = errors.New("validation failed")
+	ErrInvalidCredentials = errors.New("invalid username or password")
+	ErrUserNotFound       = errors.New("user not found")
 )
 
 type JWTCustomClaims struct {
 	jwt.RegisteredClaims
 	Username string `json:"username"`
+}
+
+type LoginParams struct {
+	Username string `validate:"required,min=3,max=32,alphanum"`
+	Password string `validate:"required,max=128"`
+}
+
+type LoginResult struct {
+	Token     string
+	UserID    string
+	ExpiresAt time.Time
 }
 
 type SignupParams struct {
@@ -49,6 +63,7 @@ type SignupResult struct {
 
 type UserStore interface {
 	CreateUser(context.Context, sqlc.CreateUserParams) (sqlc.User, error)
+	GetUserByUsername(context.Context, string) (sqlc.User, error)
 }
 
 type Service struct {
@@ -120,6 +135,55 @@ func (s *Service) Signup(ctx context.Context, params SignupParams) (SignupResult
 	}, nil
 }
 
+func (s *Service) Login(ctx context.Context, params LoginParams) (LoginResult, error) {
+	fmt.Println("HIT: Auth login service")
+
+	if err := s.validate.Struct(params); err != nil {
+		if validationErrors, ok := err.(validator.ValidationErrors); ok {
+			var errMessages []string
+			for _, e := range validationErrors {
+				errMessages = append(errMessages, formatValidationError(e))
+			}
+			return LoginResult{}, fmt.Errorf("%w: %v", ErrValidation, errMessages)
+		}
+		return LoginResult{}, fmt.Errorf("%w: %s", ErrValidation, err.Error())
+	}
+
+	user, err := s.db.GetUserByUsername(ctx, params.Username)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return LoginResult{}, ErrInvalidCredentials
+		}
+		return LoginResult{}, fmt.Errorf("failed to get user: %s", err)
+	}
+
+	if !verifyPassword(params.Password, user.PasswordHash, user.PasswordSalt) {
+		return LoginResult{}, ErrInvalidCredentials
+	}
+
+	expiresAt := time.Now().Add(time.Hour)
+	claims := JWTCustomClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "cloudtv",
+			Subject:   user.ID,
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
+		},
+		Username: user.Username,
+	}
+
+	signedToken, err := createJWT(s.jwtSecret, claims)
+	if err != nil {
+		return LoginResult{}, fmt.Errorf("error creating a JWT: %s", err)
+	}
+
+	return LoginResult{
+		Token:     signedToken,
+		UserID:    user.ID,
+		ExpiresAt: expiresAt,
+	}, nil
+}
+
 // returns a new signed JWT -- HS256
 func createJWT(key []byte, claims JWTCustomClaims) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -141,6 +205,17 @@ func hashPassword(password []byte) (passwordHash string, saltString string, err 
 	saltString = base64.StdEncoding.EncodeToString(salt)
 	passwordHash = base64.StdEncoding.EncodeToString(hash)
 	return passwordHash, saltString, nil
+}
+
+// verifyPassword checks if the provided password matches the stored hash
+func verifyPassword(password, storedHash, storedSalt string) bool {
+	salt, err := base64.StdEncoding.DecodeString(storedSalt)
+	if err != nil {
+		return false
+	}
+	hash := argon2.IDKey([]byte(password), salt, argon2Time, argon2Memory, argon2Threads, argon2KeyLen)
+	computedHash := base64.StdEncoding.EncodeToString(hash)
+	return subtle.ConstantTimeCompare([]byte(computedHash), []byte(storedHash)) == 1
 }
 
 // formatValidationError converts a FieldError into a human-readable message

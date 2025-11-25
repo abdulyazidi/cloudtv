@@ -8,3 +8,6 @@ where not exists (
   where username = $1 or email = $2
 )
 returning *;
+
+-- name: GetUserByUsername :one
+select * from users where username = $1;
