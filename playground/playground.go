@@ -1,55 +1,58 @@
 package main
 
 import (
+	"errors"
 	"fmt"
-	"log"
 
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/go-playground/validator/v10"
 )
 
-var (
-	key []byte
-	t   *jwt.Token
-	s   string
-)
+var ErrValidation = errors.New("validation failed")
 
-type CustomClaims struct {
-	Foo   int `json:"foo"`
-	LMFAO int `json:"lmfao"`
-	jwt.RegisteredClaims
+type SignupParams struct {
+	Username        string `validate:"required,min=3,max=32,alphanum"`
+	Email           string `validate:"required,email"`
+	Password        string `validate:"required,min=8,max=128"`
+	ConfirmPassword string `validate:"required,eqfield=Password"`
 }
 
 func main() {
-
-	key = []byte("XD")
-	t = jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"iss": "playground-server",
-		"sub": "john cena",
-		"foo": 1000,
-		"XD":  "005",
-	})
-	s, err := t.SignedString(key)
-
-	if err != nil {
-		log.Println(err)
+	validate := validator.New(validator.WithRequiredStructEnabled())
+	ins := SignupParams{
+		Username:        "asd",
+		Email:           "asd@asd.com",
+		Password:        "1234567",
+		ConfirmPassword: "12345678",
 	}
-	parsed, err := jwt.ParseWithClaims(s, &CustomClaims{}, func(t *jwt.Token) (interface{}, error) {
-		if t.Method != jwt.SigningMethodHS256 {
-			return nil, fmt.Errorf("unexpected signing method: %s", t.Header["alg"])
+	if err := validate.Struct(ins); err != nil {
+		if validationErrors, ok := err.(validator.ValidationErrors); ok {
+			var errMessages []string
+			for _, e := range validationErrors {
+				errMessages = append(errMessages, formatValidationError(e))
+			}
+			fmt.Println(errMessages)
+
 		}
-		return key, nil
-	}, jwt.WithIssuer("playground-server"))
-
-	if err != nil {
-		log.Fatalf("token rejected: %v", err)
 	}
+	fmt.Println("end")
 
-	claims, ok := parsed.Claims.(*CustomClaims)
-	if !ok || !parsed.Valid {
-		log.Fatal("token failed signature or standard-claim validation")
+}
+
+func formatValidationError(e validator.FieldError) string {
+	switch e.Tag() {
+	case "required":
+		return fmt.Sprintf("%s is required", e.Field())
+	case "email":
+		return fmt.Sprintf("%s must be a valid email", e.Field())
+	case "min":
+		return fmt.Sprintf("%s must be at least %s characters", e.Field(), e.Param())
+	case "max":
+		return fmt.Sprintf("%s must be at most %s characters", e.Field(), e.Param())
+	case "alphanum":
+		return fmt.Sprintf("%s must contain only letters and numbers", e.Field())
+	case "eqfield":
+		return fmt.Sprintf("%s must match %s", e.Field(), e.Param())
+	default:
+		return fmt.Sprintf("%s failed %s validation", e.Field(), e.Tag())
 	}
-
-	// fmt.Println(parsed.Raw)
-	fmt.Println(claims.Foo)
-	// fmt.Println("JWT TOKEN:", s)
 }
