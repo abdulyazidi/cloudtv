@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/abdulyazidi/cloudtv/backend/internal/db/sqlc"
+	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/argon2"
 )
 
@@ -24,7 +26,7 @@ var (
 
 var (
 	ErrUserAlreadyExists = errors.New("user with this username or email already exists")
-	ErrInvalidInput      = errors.New("invalid input parameters")
+	ErrValidation        = errors.New("validation failed")
 )
 
 type JWTCustomClaims struct {
@@ -33,9 +35,10 @@ type JWTCustomClaims struct {
 }
 
 type SignupParams struct {
-	Username string
-	Email    string
-	Password string
+	Username        string `validate:"required,min=3,max=32,alphanum"`
+	Email           string `validate:"required,email"`
+	Password        string `validate:"required,min=8,max=128"`
+	ConfirmPassword string `validate:"required,eqfield=Password"`
 }
 
 type SignupResult struct {
@@ -51,19 +54,29 @@ type UserStore interface {
 type Service struct {
 	db        UserStore
 	jwtSecret []byte
+	validate  *validator.Validate
 }
 
 func NewService(db UserStore, jwtSecret []byte) *Service {
 	return &Service{
 		db:        db,
 		jwtSecret: jwtSecret,
+		validate:  validator.New(validator.WithRequiredStructEnabled()),
 	}
 }
 
 func (s *Service) Signup(ctx context.Context, params SignupParams) (SignupResult, error) {
 	fmt.Println("HIT: Auth signup service")
-	if params.Email == "" || params.Username == "" || params.Password == "" {
-		return SignupResult{}, ErrInvalidInput
+
+	if err := s.validate.Struct(params); err != nil {
+		if validationErrors, ok := err.(validator.ValidationErrors); ok {
+			var errMessages []string
+			for _, e := range validationErrors {
+				errMessages = append(errMessages, formatValidationError(e))
+			}
+			return SignupResult{}, fmt.Errorf("%w: %v", ErrValidation, errMessages)
+		}
+		return SignupResult{}, fmt.Errorf("%w: %s", ErrValidation, err.Error())
 	}
 
 	passwordHash, salt, err := hashPassword([]byte(params.Password))
@@ -79,6 +92,9 @@ func (s *Service) Signup(ctx context.Context, params SignupParams) (SignupResult
 	})
 
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return SignupResult{}, ErrUserAlreadyExists
+		}
 		return SignupResult{}, fmt.Errorf("failed to create a new user: %s", err)
 	}
 	expiresAt := time.Now().Add(time.Hour)
@@ -125,4 +141,24 @@ func hashPassword(password []byte) (passwordHash string, saltString string, err 
 	saltString = base64.StdEncoding.EncodeToString(salt)
 	passwordHash = base64.StdEncoding.EncodeToString(hash)
 	return passwordHash, saltString, nil
+}
+
+// formatValidationError converts a FieldError into a human-readable message
+func formatValidationError(e validator.FieldError) string {
+	switch e.Tag() {
+	case "required":
+		return fmt.Sprintf("%s is required", e.Field())
+	case "email":
+		return fmt.Sprintf("%s must be a valid email", e.Field())
+	case "min":
+		return fmt.Sprintf("%s must be at least %s characters", e.Field(), e.Param())
+	case "max":
+		return fmt.Sprintf("%s must be at most %s characters", e.Field(), e.Param())
+	case "alphanum":
+		return fmt.Sprintf("%s must contain only letters and numbers", e.Field())
+	case "eqfield":
+		return fmt.Sprintf("%s must match %s", e.Field(), e.Param())
+	default:
+		return fmt.Sprintf("%s failed %s validation", e.Field(), e.Tag())
+	}
 }

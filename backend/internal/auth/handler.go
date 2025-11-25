@@ -21,11 +21,12 @@ func NewHandler(service *Service) *Handler {
 
 func (h *Handler) Signup(ctx context.Context, req *pb.SignupRequest) (*pb.SignupResponse, error) {
 	fmt.Println("HIT: Auth signup handler")
-	// TODO: Input validation
+
 	signupResponse, err := h.service.Signup(ctx, SignupParams{
-		Username: req.Username,
-		Email:    req.Email,
-		Password: req.Password,
+		Username:        req.Username,
+		Email:           req.Email,
+		Password:        req.Password,
+		ConfirmPassword: req.ConfirmPassword,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error creating a new user: %s", err)
